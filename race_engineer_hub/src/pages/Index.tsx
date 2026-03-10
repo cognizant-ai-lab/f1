@@ -1,4 +1,4 @@
-import { TyreTelemetry } from "@/components/TyreTelemetry";
+import { TyreWear } from "@/components/TyreWear";
 import { EngineTelemetry } from "@/components/EngineTelemetry";
 import { AeroTelemetry } from "@/components/AeroTelemetry";
 import { TyreAlertPanel } from "@/components/TyreAlertPanel";
@@ -66,7 +66,7 @@ const Index = () => {
       {/* Telemetry Grid + Alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3 flex-1 min-h-0">
         <div className="flex flex-col gap-2 min-h-0">
-          <TyreTelemetry />
+          <TyreWear />
           <TyreAlertPanel alerts={tyreAlerts} activeCount={tyreActiveCount} engineerResponses={tyresReport.responses} />
         </div>
         <div className="flex flex-col gap-2 min-h-0">

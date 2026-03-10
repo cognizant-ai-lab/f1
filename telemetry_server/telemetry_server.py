@@ -1082,10 +1082,13 @@ def build_message() -> tuple[str, list[dict], list[dict], list[dict]]:
     track_id = session_state.get("track_id", -1)
     last_lap_ms = lap_state.get("last_lap_time_ms", 0)
 
+    # Use 5000 m default for replay (CSV may not have track_length_m)
+    track_length_m = session_state.get("track_length_m", 5000) or 5000
     session = {
         "sessionType": SESSION_TYPE_LABELS.get(session_type, f"SESSION {session_type}"),
         "trackName": TRACK_NAMES.get(track_id, f"TRACK {track_id}"),
         "totalLaps": session_state.get("total_laps", 0),
+        "trackLengthM": track_length_m,
         "sessionTimeLeft": session_state.get("session_time_left", 0),
         "sessionDuration": session_state.get("session_duration", 0),
         "trackTemp": session_state.get("track_temperature", 0),
@@ -1096,12 +1099,21 @@ def build_message() -> tuple[str, list[dict], list[dict], list[dict]]:
         "lastLapTimeMs": last_lap_ms,
     }
 
+    lap_distance_m = lap_state.get("lap_distance_m", 0)
+    total_distance_m = lap_state.get("total_distance_m")
+    if total_distance_m is None and track_length_m > 0:
+        current_lap = lap_state.get("current_lap_num", 1)
+        total_distance_m = (current_lap - 1) * track_length_m + lap_distance_m
+    total_distance_m = round(total_distance_m, 2) if total_distance_m is not None else lap_distance_m
+
     msg = json.dumps({
         "tyres": tyres,
         "compound": status_state.get("tyre_compound_actual", ""),
         "compoundVisual": status_state.get("tyre_compound_visual", ""),
         "tyresAgeLaps": status_state.get("tyres_age_laps", 0),
         "currentLap": lap_state.get("current_lap_num", 0),
+        "lapDistanceM": lap_distance_m,
+        "totalDistanceM": total_distance_m,
         "speed": telemetry_state.get("speed_kmh", 0),
         "sessionTime": session_time,
         "powerUnit": power_unit,

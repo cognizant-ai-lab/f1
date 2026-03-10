@@ -325,6 +325,7 @@ class F1TelemetryParser:  # pylint: disable=too-many-instance-attributes,too-few
             "session_type": fields[5],
             "track_id": fields[6],
             "total_laps": fields[3],
+            "track_length_m": int(fields[4]),
             "session_time_left": fields[8],
             "session_duration": fields[9],
             "track_temperature": fields[1],
@@ -342,6 +343,7 @@ class F1TelemetryParser:  # pylint: disable=too-many-instance-attributes,too-few
         self.lap_state = {
             "current_lap_num": fields[14],
             "lap_distance_m": round(fields[10], 2),
+            "total_distance_m": round(fields[11], 2),
             "car_position": fields[13],
             "last_lap_time_ms": fields[0],
             "current_lap_time_ms": fields[1],
