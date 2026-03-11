@@ -1,18 +1,27 @@
 import { Circle } from "lucide-react";
 import { Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
-import { TelemetryCard } from "./TelemetryCard";
+import { TelemetryCard, BarGauge } from "./TelemetryCard";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "./ui/chart";
 import type { ChartConfig } from "./ui/chart";
 import { useTyreTelemetry } from "@/hooks/useTyreTelemetry";
 import type { WearHistoryPoint } from "@/hooks/useTyreTelemetry";
 
-const CHART_CONFIG: ChartConfig = {
+const TYRE_LINE_COLORS = { rl: "#ef4444", rr: "#f97316", fl: "#3b82f6", fr: "#22c55e" } as const;
+
+const WEAR_CHART_CONFIG: ChartConfig = {
   distanceKm: { label: "Distance (km)", color: "hsl(var(--muted-foreground))" },
-  rl: { label: "Rear Left", color: "#ef4444" },
-  rr: { label: "Rear Right", color: "#f97316" },
-  fl: { label: "Front Left", color: "#3b82f6" },
-  fr: { label: "Front Right", color: "#22c55e" },
+  rl: { label: "Rear Left", color: TYRE_LINE_COLORS.rl },
+  rr: { label: "Rear Right", color: TYRE_LINE_COLORS.rr },
+  fl: { label: "Front Left", color: TYRE_LINE_COLORS.fl },
+  fr: { label: "Front Right", color: TYRE_LINE_COLORS.fr },
 };
+
+const TYRE_POSITIONS = [
+  { key: "fl" as const, label: "FL" },
+  { key: "fr" as const, label: "FR" },
+  { key: "rl" as const, label: "RL" },
+  { key: "rr" as const, label: "RR" },
+];
 
 const MIN_DISTANCE_KM_FOR_PROJECTION = 0.1; // 100 m – start estimating as soon as car has traveled this far
 
@@ -116,7 +125,7 @@ export function TyreWear() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-stretch">
-          <ChartContainer config={CHART_CONFIG} className="h-[200px] w-full min-w-0">
+          <ChartContainer config={WEAR_CHART_CONFIG} className="h-[200px] w-full min-w-0">
             <LineChart
               data={wearHistory}
               margin={{ top: 28, right: 8, bottom: 24, left: 8 }}
@@ -166,25 +175,53 @@ export function TyreWear() {
                   }}
                 />
               ))}
-              <Line type="monotone" dataKey="rl" stroke="#ef4444" dot={false} strokeWidth={2} name="Rear Left" />
-              <Line type="monotone" dataKey="rr" stroke="#f97316" dot={false} strokeWidth={2} name="Rear Right" />
-              <Line type="monotone" dataKey="fl" stroke="#3b82f6" dot={false} strokeWidth={2} name="Front Left" />
-              <Line type="monotone" dataKey="fr" stroke="#22c55e" dot={false} strokeWidth={2} name="Front Right" />
+              <Line type="monotone" dataKey="rl" stroke={TYRE_LINE_COLORS.rl} dot={false} strokeWidth={2} name="Rear Left" />
+              <Line type="monotone" dataKey="rr" stroke={TYRE_LINE_COLORS.rr} dot={false} strokeWidth={2} name="Rear Right" />
+              <Line type="monotone" dataKey="fl" stroke={TYRE_LINE_COLORS.fl} dot={false} strokeWidth={2} name="Front Left" />
+              <Line type="monotone" dataKey="fr" stroke={TYRE_LINE_COLORS.fr} dot={false} strokeWidth={2} name="Front Right" />
             </LineChart>
           </ChartContainer>
-          <div className="flex flex-col items-center justify-center border border-border/50 rounded-md bg-secondary/30 px-4 py-3 min-w-[140px]">
-            <span className="text-[10px] font-display font-bold tracking-wider text-muted-foreground uppercase">
-              Projected Tyre Life (laps)
-            </span>
-            <span className="font-display text-3xl md:text-4xl font-bold tabular-nums text-primary mt-1">
-              {projectedLaps != null
-                ? projectedLaps >= 999
-                  ? "999+"
-                  : projectedLaps < 0
+          <div className="flex flex-col min-w-[140px] sm:min-w-[160px] gap-2 flex-1">
+            <div className="shrink-0 flex flex-col items-center justify-center border border-border/50 rounded-md bg-secondary/30 px-3 py-1.5">
+              <span className="text-[9px] font-display font-bold tracking-wider text-muted-foreground uppercase">
+                Projected Tyre Life (laps)
+              </span>
+              <span className="font-display text-2xl font-bold tabular-nums text-primary leading-tight">
+                {projectedLaps != null && projectedLaps < 999
+                  ? projectedLaps < 0
                     ? "—"
                     : projectedLaps.toFixed(1)
-                : "—"}
-            </span>
+                  : "—"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 min-h-0 flex-1">
+              <div className="flex flex-col gap-1 bg-secondary/30 rounded-md border border-border/50 p-2">
+                <span className="text-[9px] font-display font-bold tracking-wider text-muted-foreground uppercase">Damage</span>
+                {TYRE_POSITIONS.map((p) => (
+                  <BarGauge
+                    key={p.key}
+                    value={data.tyres[p.key].damage}
+                    max={255}
+                    label={p.label}
+                    warn={50}
+                    critical={150}
+                  />
+                ))}
+              </div>
+              <div className="flex flex-col gap-1 bg-secondary/30 rounded-md border border-border/50 p-2">
+                <span className="text-[9px] font-display font-bold tracking-wider text-muted-foreground uppercase">Blisters</span>
+                {TYRE_POSITIONS.map((p) => (
+                  <BarGauge
+                    key={p.key}
+                    value={data.tyres[p.key].blisters}
+                    max={255}
+                    label={p.label}
+                    warn={50}
+                    critical={150}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
