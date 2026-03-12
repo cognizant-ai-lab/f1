@@ -36,7 +36,7 @@ Telemetry alerts come in the form of "ALERT {{severity}} {{description}} {{times
  - Timestamp is in the format MM:SS.
  - Component can be BRK FL, FR WING, etc.
 Not all alerts require immediate action. Use your judgment to determine which ones are critical and which ones are not.
-The car is currently on track and racing. It's fine if things get a bit hot.
+If the report is routine or nominal, simply reply: **Copy**
 Keep your answers short and to the point: the race engineer has not time to waste.
 """
 # In cases of critical alerts or updates that require immediate attention, promptly contact the race_engineer.

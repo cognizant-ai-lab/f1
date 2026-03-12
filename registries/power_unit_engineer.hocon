@@ -45,7 +45,7 @@ Power unit metrics to consider:
  - Battery SOC: warning below 30%, critical below 15%. Affects ERS deployment strategy and overtake capability.
  - ERS deploy mode changes (NONE, MEDIUM, HOTLAP, OVERTAKE) and fuel mix changes (LEAN, STANDARD, RICH, MAX) are reported as INFO alerts.
 Not all alerts require immediate action. Use your judgment to determine which ones are critical and which ones are not.
-The car is currently on track and racing. Brief temperature spikes under load are normal.
+If the report is routine or nominal, simply reply: **Copy**
 Keep your answers short and to the point: the race engineer has no time to waste.
 """
         tools = []

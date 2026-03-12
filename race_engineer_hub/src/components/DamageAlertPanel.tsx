@@ -61,13 +61,13 @@ const rowStyles = {
   critical: "border-accent/20 bg-accent/5",
 };
 
-interface AeroAlertPanelProps {
+interface DamageAlertPanelProps {
   alerts: Alert[];
   activeCount: number;
   engineerResponses: DamageReportEntry[];
 }
 
-export function AeroAlertPanel({ alerts, activeCount, engineerResponses }: AeroAlertPanelProps) {
+export function DamageAlertPanel({ alerts, activeCount, engineerResponses }: DamageAlertPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const items = mergeItems(alerts, engineerResponses);
   const scrollRef = useAutoScroll<HTMLDivElement>(items.length);
@@ -109,7 +109,7 @@ export function AeroAlertPanel({ alerts, activeCount, engineerResponses }: AeroA
           onDoubleClick={() => setExpanded(true)}
         >
           <Wind className="h-4 w-4 text-primary" />
-          <span className="font-display text-sm font-bold tracking-widest uppercase text-foreground">Aero Agent</span>
+          <span className="font-display text-sm font-bold tracking-widest uppercase text-foreground">Damage Agent</span>
           <Maximize2 className="h-2.5 w-2.5 text-muted-foreground/50 ml-1" />
           {hasAnalysis && <Bot className="h-4 w-4 text-info ml-1" />}
           <span className={`ml-auto font-display text-[10px] font-bold ${counterColor}`}>{activeCount}</span>
@@ -136,7 +136,7 @@ export function AeroAlertPanel({ alerts, activeCount, engineerResponses }: AeroA
           >
             <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border/50 bg-secondary/30">
               <AlertTriangle className="h-3 w-3 text-muted-foreground" />
-              <span className="font-display text-sm font-bold tracking-widest uppercase text-foreground">Aero Agent</span>
+              <span className="font-display text-sm font-bold tracking-widest uppercase text-foreground">Damage Agent</span>
               {hasAnalysis && <Bot className="h-4 w-4 text-info ml-1" />}
               <span className={`ml-auto font-display text-[10px] font-bold ${counterColor}`}>{activeCount}</span>
             </div>

@@ -3,7 +3,7 @@ import { EngineTelemetry } from "@/components/EngineTelemetry";
 import { AeroTelemetry } from "@/components/AeroTelemetry";
 import { TyreAlertPanel } from "@/components/TyreAlertPanel";
 import { PuAlertPanel } from "@/components/PuAlertPanel";
-import { AeroAlertPanel } from "@/components/AeroAlertPanel";
+import { DamageAlertPanel } from "@/components/DamageAlertPanel";
 import { RaceEngineerPanel } from "@/components/RaceEngineerPanel";
 import { DriverRadioInput } from "@/components/DriverRadioInput";
 import { TrackMap } from "@/components/TrackMap";
@@ -148,7 +148,7 @@ const Index = () => {
         </div>
         <div className="flex flex-col gap-2 min-h-0">
           <AeroTelemetry />
-          <AeroAlertPanel alerts={aeroAlerts} activeCount={aeroActiveCount} engineerResponses={damageReport.responses} />
+          <DamageAlertPanel alerts={aeroAlerts} activeCount={aeroActiveCount} engineerResponses={damageReport.responses} />
         </div>
       </div>
 

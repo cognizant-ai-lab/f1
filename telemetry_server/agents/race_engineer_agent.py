@@ -7,7 +7,7 @@ from typing import Any
 from neuro_san.client.agent_session_factory import AgentSessionFactory
 from neuro_san.client.streaming_input_processor import StreamingInputProcessor
 
-TEST_INPUT = "Damage Engineer: Front right wing damage critical (100%). Recommend box this lap for new nose."
+TEST_INPUT = "From Damage Engineer: Front right wing damage critical (100%). Recommend box this lap for new nose."
 
 
 class RaceEngineerAgent:

@@ -15,28 +15,24 @@ import csv
 import json
 import os
 import socket
-import struct
 import time
 from pathlib import Path
 
 import websockets
 
-from telemetry_server.damage_agent import DamageAgent
-from telemetry_server.power_unit_agent import PowerUnitAgent
-from telemetry_server.race_engineer_agent import RaceEngineerAgent
-from telemetry_server.tyres_agent import TyresAgent
+from telemetry_server.agents.damage_agent import DamageAgent
+from telemetry_server.agents.power_unit_agent import PowerUnitAgent
+from telemetry_server.agents.race_engineer_agent import RaceEngineerAgent
+from telemetry_server.agents.tyres_agent import TyresAgent
 
 # ---------------------------------------------------------------------------
 # Re-use constants, struct definitions, and parser from f1_telemetry_parser.py
 # ---------------------------------------------------------------------------
 from telemetry_server.f1_telemetry_parser import (
-    ACTUAL_COMPOUND,
     F1TelemetryParser,
-    HEADER_SIZE,
+    PACKET_ID_SESSION,
     NUM_CARS,
     PACKET_ID_CAR_TELEMETRY,
-    PACKET_ID_SESSION,
-    VISUAL_COMPOUND,
     WHEEL_NAMES,
 )
 
@@ -112,11 +108,11 @@ PU_AGENT_BATCH_DELAY: float = 1.0  # seconds to wait before flushing
 
 # RaceEngineerAgent state
 re_agent: RaceEngineerAgent | None = None
-re_agent_response: str | None = None
-re_agent_response_time: str | None = None
 re_agent_in_flight: bool = False
 re_agent_pending: list[str] = []
 re_agent_batch_handle: asyncio.TimerHandle | None = None
+re_alerts_log: list = []       # accumulated messages received by the race engineer
+re_responses_log: list = []    # accumulated race engineer responses (split per target)
 RE_AGENT_BATCH_DELAY: float = 2.0  # longer window to batch multiple engineer reports
 
 # ---------------------------------------------------------------------------
@@ -350,6 +346,11 @@ def _format_session_time(seconds: float) -> str:
     return f"{m:02d}:{s:02d}"
 
 
+def _is_copy_ack(text: str) -> bool:
+    """Return True if the text is a bare 'Copy' acknowledgment, ignoring markdown bold."""
+    return text.strip().strip("*").strip().lower() == "copy"
+
+
 WEATHER_LABELS = {
     0: "Clear", 1: "Light Cloud", 2: "Overcast",
     3: "Light Rain", 4: "Heavy Rain", 5: "Storm",
@@ -399,7 +400,8 @@ def _process_aero_alerts(aero: dict) -> None:
     """Port of useAeroAlerts.ts — accumulates alerts into aero_alerts_log."""
     global aero_alert_conditions, aero_alerts_log, prev_aero_session_time
     global damage_agent_response, damage_agent_response_time, damage_agent_pending, damage_agent_batch_handle
-    global re_agent_response, re_agent_response_time, re_agent_pending, re_agent_batch_handle
+    global re_agent_pending, re_agent_batch_handle
+    global re_alerts_log, re_responses_log
 
     st = aero.get("sessionTime", 0.0)
 
@@ -413,9 +415,9 @@ def _process_aero_alerts(aero: dict) -> None:
         if damage_agent_batch_handle is not None:
             damage_agent_batch_handle.cancel()
             damage_agent_batch_handle = None
-        re_agent_response = None
-        re_agent_response_time = None
         re_agent_pending = []
+        re_alerts_log = []
+        re_responses_log = []
         if re_agent_batch_handle is not None:
             re_agent_batch_handle.cancel()
             re_agent_batch_handle = None
@@ -879,11 +881,11 @@ async def _flush_damage_agent() -> None:
     damage_agent_in_flight = True
     try:
         response = await asyncio.to_thread(damage_agent.process_messages, batch)
-        damage_agent_response = response
-        damage_agent_response_time = _format_session_time(prev_aero_session_time)
-        # Forward to race engineer
-        if response:
-            _queue_race_engineer([f"Damage Engineer: {response}"])
+        # Skip bare "Copy" acknowledgments
+        if response and not _is_copy_ack(response):
+            damage_agent_response = response
+            damage_agent_response_time = _format_session_time(prev_aero_session_time)
+            _queue_race_engineer([f"From Damage Engineer: {response}"])
     except Exception as exc:
         print(f"DamageAgent error: {exc}")
     finally:
@@ -929,11 +931,11 @@ async def _flush_tyres_agent() -> None:
     tyres_agent_in_flight = True
     try:
         response = await asyncio.to_thread(tyres_agent.process_messages, batch)
-        tyres_agent_response = response
-        tyres_agent_response_time = _format_session_time(prev_tyre_session_time)
-        # Forward to race engineer
-        if response:
-            _queue_race_engineer([f"Tyres Engineer: {response}"])
+        # Skip bare "Copy" acknowledgments
+        if response and not _is_copy_ack(response):
+            tyres_agent_response = response
+            tyres_agent_response_time = _format_session_time(prev_tyre_session_time)
+            _queue_race_engineer([f"From Tyres Engineer: {response}"])
     except Exception as exc:
         print(f"TyresAgent error: {exc}")
     finally:
@@ -978,11 +980,11 @@ async def _flush_pu_agent() -> None:
     pu_agent_in_flight = True
     try:
         response = await asyncio.to_thread(pu_agent.process_messages, batch)
-        pu_agent_response = response
-        pu_agent_response_time = _format_session_time(prev_pu_session_time)
-        # Forward to race engineer
-        if response:
-            _queue_race_engineer([f"Power Unit Engineer: {response}"])
+        # Skip bare "Copy" acknowledgments
+        if response and not _is_copy_ack(response):
+            pu_agent_response = response
+            pu_agent_response_time = _format_session_time(prev_pu_session_time)
+            _queue_race_engineer([f"From Power Unit Engineer: {response}"])
     except Exception as exc:
         print(f"PowerUnitAgent error: {exc}")
     finally:
@@ -998,6 +1000,11 @@ def _queue_race_engineer(messages: list[str]) -> None:
 
     re_agent_pending.extend(messages)
 
+    # Log incoming messages so they appear in the Race Engineer panel
+    ts = _format_session_time(session_time)
+    for msg in messages:
+        re_alerts_log.append({"level": "info", "message": msg, "time": ts})
+
     if re_agent_batch_handle is not None:
         re_agent_batch_handle.cancel()
 
@@ -1009,25 +1016,89 @@ def _queue_race_engineer(messages: list[str]) -> None:
 
 
 def _route_race_engineer_response(response: str) -> None:
-    """Parse the race engineer's response and route follow-up questions to specialists."""
-    route_fns = {
-        "Damage Engineer:": _queue_damage_alerts,
-        "Tyres Engineer:": _queue_tyres_alerts,
-        "Power Unit Engineer:": _queue_pu_alerts,
+    """Parse the race engineer's response and route follow-up questions to specialists.
+
+    Handles multi-line messages per target: lines without a known prefix are
+    appended to the most recently matched target. This way the race engineer
+    can send multi-line messages to a single specialist or address multiple
+    specialists in one response.
+    """
+    route_targets = {
+        "To Damage Engineer:": (_queue_damage_alerts, aero_alerts_log),
+        "To Tyres Engineer:": (_queue_tyres_alerts, tyre_alerts_log),
+        "To Power Unit Engineer:": (_queue_pu_alerts, pu_alerts_log),
     }
+    ts = _format_session_time(session_time)
+
+    # Accumulate (target_key, lines) blocks so multi-line messages stay together
+    current_target: str | None = None
+    accumulated_lines: list[str] = []
+    blocks: list[tuple[str, str]] = []  # (target_key, full_message)
+
+    def _flush_block() -> None:
+        if current_target and accumulated_lines:
+            blocks.append((current_target, " ".join(accumulated_lines)))
+
     for line in response.strip().splitlines():
         line = line.strip()
-        for prefix, queue_fn in route_fns.items():
+        if not line:
+            continue
+        matched = False
+        for prefix in route_targets:
             if line.startswith(prefix):
-                msg = line[len(prefix):].strip()
-                if msg:
-                    queue_fn([msg])
+                _flush_block()
+                current_target = prefix
+                accumulated_lines = []
+                remainder = line[len(prefix):].strip()
+                if remainder:
+                    accumulated_lines.append(remainder)
+                matched = True
                 break
+        if not matched and current_target:
+            # Continuation line for the current target
+            accumulated_lines.append(line)
+
+    _flush_block()
+
+    # Dispatch each block to the appropriate specialist
+    for target_key, msg in blocks:
+        queue_fn, alerts_log = route_targets[target_key]
+        prefixed = f"From Race Engineer: {msg}"
+        queue_fn([prefixed])
+        alerts_log.append({"level": "info", "message": prefixed, "time": ts})
+
+
+def _split_race_engineer_response(response: str) -> list[str]:
+    """Split a race engineer response into individual messages per target.
+
+    Each block starts with a known prefix (e.g. "To Fernando:", "To Damage Engineer:").
+    Continuation lines (no prefix) are appended to the current block.
+    Text without any prefix is kept as a standalone block.
+    """
+    prefixes = ("To Fernando:", "To Damage Engineer:", "To Tyres Engineer:", "To Power Unit Engineer:")
+    blocks: list[str] = []
+    current_lines: list[str] = []
+
+    for line in response.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if any(line.startswith(p) for p in prefixes):
+            if current_lines:
+                blocks.append(" ".join(current_lines))
+            current_lines = [line]
+        else:
+            current_lines.append(line)
+
+    if current_lines:
+        blocks.append(" ".join(current_lines))
+
+    return blocks
 
 
 async def _flush_race_engineer() -> None:
     """Drain the pending list and send the batch to the RaceEngineerAgent."""
-    global re_agent_response, re_agent_response_time, re_agent_in_flight, re_agent_pending
+    global re_agent_in_flight, re_agent_pending
     global re_agent_batch_handle
 
     re_agent_batch_handle = None
@@ -1046,9 +1117,10 @@ async def _flush_race_engineer() -> None:
     try:
         response = await asyncio.to_thread(re_agent.process_messages, batch)
         # Don't send bare "Copy" acknowledgments to the frontend
-        if response and response.strip().lower() != "copy":
-            re_agent_response = response
-            re_agent_response_time = _format_session_time(session_time)
+        if response and not _is_copy_ack(response):
+            ts = _format_session_time(session_time)
+            for msg in _split_race_engineer_response(response):
+                re_responses_log.append({"text": msg, "time": ts})
     except Exception as exc:
         print(f"RaceEngineerAgent error: {exc}")
     finally:
@@ -1253,8 +1325,8 @@ def build_message() -> tuple[str, list[dict], list[dict], list[dict]]:
             "time": pu_agent_response_time,
         },
         "raceEngineerReport": {
-            "response": re_agent_response,
-            "time": re_agent_response_time,
+            "responses": re_responses_log,
+            "alerts": re_alerts_log,
         },
     })
     return msg, new_aero_alerts, new_tyre_alerts, new_pu_alerts
@@ -1284,7 +1356,7 @@ async def ws_handler(websocket):
                 incoming = json.loads(raw)
                 driver_msg = incoming.get("driverMessage")
                 if driver_msg and isinstance(driver_msg, str):
-                    _queue_race_engineer([f"Fernando: {driver_msg}"])
+                    _queue_race_engineer([f"From Fernando: {driver_msg}"])
             except (json.JSONDecodeError, AttributeError):
                 pass
     finally:
