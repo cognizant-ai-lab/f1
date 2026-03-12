@@ -1,13 +1,22 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { Radio, Send } from "lucide-react";
-import { useAutoScroll } from "@/hooks/useAutoScroll";
 
 const WS_URL = "ws://localhost:8765";
 
-export function DriverRadioInput() {
+interface DriverRadioInputProps {
+  onSend?: (text: string, time: string) => void;
+  onSessionReset?: () => void;
+}
+
+function formatSessionTime(seconds: number): string {
+  const total = Math.floor(seconds);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+export function DriverRadioInput({ onSend, onSessionReset }: DriverRadioInputProps) {
   const [message, setMessage] = useState("");
-  const [history, setHistory] = useState<string[]>([]);
-  const historyRef = useAutoScroll<HTMLDivElement>(history.length);
   const prevSessionTime = useRef<number>(0);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -25,7 +34,7 @@ export function DriverRadioInput() {
           const msg = JSON.parse(event.data);
           const st = msg.sessionTime ?? 0;
           if (st < prevSessionTime.current) {
-            setHistory([]);
+            onSessionReset?.();
           }
           prevSessionTime.current = st;
         } catch {
@@ -55,10 +64,10 @@ export function DriverRadioInput() {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ driverMessage: text }));
-      setHistory((prev) => [...prev, text]);
+      onSend?.(text, formatSessionTime(prevSessionTime.current));
       setMessage("");
     }
-  }, [message]);
+  }, [message, onSend]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -78,18 +87,6 @@ export function DriverRadioInput() {
           Driver Radio
         </h2>
       </div>
-      {history.length > 0 && (
-        <div ref={historyRef} className="max-h-24 overflow-y-auto border-b border-border/30">
-          {history.map((msg, i) => (
-            <div key={i} className="flex items-start gap-2 px-3 py-1.5">
-              <span className="font-display text-[9px] font-bold tracking-wider text-accent/60 shrink-0 mt-px">
-                FERNANDO &gt;
-              </span>
-              <span className="text-[11px] text-muted-foreground leading-tight">{msg}</span>
-            </div>
-          ))}
-        </div>
-      )}
       <div className="flex items-center gap-2 p-3">
         <span className="font-display text-[10px] font-bold tracking-wider text-accent shrink-0">
           FERNANDO &gt;

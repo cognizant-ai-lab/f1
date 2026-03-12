@@ -42,7 +42,6 @@ Tyre metrics to consider:
  - Damage (0-255 scale): warning above 50, critical above 150. Structural integrity risk at high values.
  - Blistering (0-255 scale): warning above 50, critical above 150. Indicates thermal cycling issues.
 Not all alerts require immediate action. Use your judgment to determine which ones are critical and which ones are not.
-The car is currently on track and racing. Mild temperature spikes during hard pushing are expected.
 Keep your answers short and to the point: the race engineer has no time to waste.
 """
         tools = []

@@ -6,6 +6,7 @@ export interface SessionData {
   totalLaps: number;
   sessionTimeLeft: number;
   sessionDuration: number;
+  trackLength: number;
   trackTemp: number;
   airTemp: number;
   weather: number;

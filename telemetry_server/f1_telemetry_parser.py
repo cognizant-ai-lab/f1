@@ -6,14 +6,19 @@ used by both ``tyre_logger`` and ``telemetry_server``.
 
 import struct
 
+from telemetry_server.f1_constants import DRIVER_ABBREVIATIONS
+from telemetry_server.f1_constants import TEAM_ABBREVIATIONS
+
 # ---------------------------------------------------------------------------
 # Packet IDs (F1 25 spec)
 # ---------------------------------------------------------------------------
+PACKET_ID_MOTION = 0
 PACKET_ID_SESSION = 1
 PACKET_ID_LAP_DATA = 2
 PACKET_ID_CAR_SETUPS = 5
 PACKET_ID_CAR_TELEMETRY = 6
 PACKET_ID_CAR_STATUS = 7
+PACKET_ID_PARTICIPANTS = 4
 PACKET_ID_CAR_DAMAGE = 10
 PACKET_ID_MOTION_EX = 13
 
@@ -45,6 +50,26 @@ SESSION_HEADER_STRUCT = struct.Struct(
     "H"  # m_sessionDuration
 )
 SESSION_HEADER_SIZE = SESSION_HEADER_STRUCT.size  # pylint: disable=invalid-name  # 13
+
+# ParticipantData struct (57 bytes per car)
+PARTICIPANT_STRUCT = struct.Struct(
+    "<"
+    "B"   # m_aiControlled
+    "B"   # m_driverId
+    "B"   # m_networkId
+    "B"   # m_teamId
+    "B"   # m_myTeam
+    "B"   # m_raceNumber
+    "B"   # m_nationality
+    "32s" # m_name (null-terminated UTF-8, cs_maxParticipantNameLen=32)
+    "B"   # m_yourTelemetry
+    "B"   # m_showOnlineNames
+    "H"   # m_techLevel
+    "B"   # m_platform
+    "B"   # m_numColours
+    "12s" # m_liveryColours (4 × LiveryColour, 3 bytes each)
+)
+PARTICIPANT_SIZE = PARTICIPANT_STRUCT.size  # pylint: disable=invalid-name  # 57
 
 # LapData struct (57 bytes)
 LAPDATA_STRUCT = struct.Struct(
@@ -229,6 +254,30 @@ MOTION_EX_STRUCT = struct.Struct(
 )
 MOTION_EX_SIZE = MOTION_EX_STRUCT.size  # pylint: disable=invalid-name  # 244
 
+# CarMotionData (60 bytes per car)
+CAR_MOTION_STRUCT = struct.Struct(
+    "<"
+    "f"   # m_worldPositionX
+    "f"   # m_worldPositionY
+    "f"   # m_worldPositionZ
+    "f"   # m_worldVelocityX
+    "f"   # m_worldVelocityY
+    "f"   # m_worldVelocityZ
+    "h"   # m_worldForwardDirX  (normalised * 32767)
+    "h"   # m_worldForwardDirY
+    "h"   # m_worldForwardDirZ
+    "h"   # m_worldRightDirX
+    "h"   # m_worldRightDirY
+    "h"   # m_worldRightDirZ
+    "f"   # m_gForceLateral
+    "f"   # m_gForceLongitudinal
+    "f"   # m_gForceVertical
+    "f"   # m_yaw
+    "f"   # m_pitch
+    "f"   # m_roll
+)
+CAR_MOTION_SIZE = CAR_MOTION_STRUCT.size  # pylint: disable=invalid-name  # 60
+
 # ---------------------------------------------------------------------------
 # Tyre compound lookups
 # ---------------------------------------------------------------------------
@@ -282,6 +331,10 @@ class F1TelemetryParser:  # pylint: disable=too-many-instance-attributes,too-few
         self.motion_ex_state: dict = {}
         self.session_time: float = 0.0
         self.session_uid: int = 0
+        self.player_car_index: int = 0
+        self.motion_data: list[dict] = []
+        self.all_cars_lap_data: list[dict] = []
+        self.participants_data: list[dict] = []
 
     def parse_packet(self, data: bytes) -> int | None:  # pylint: disable=too-many-return-statements
         """Parse a raw UDP packet and update internal state.
@@ -296,11 +349,16 @@ class F1TelemetryParser:  # pylint: disable=too-many-instance-attributes,too-few
         packet_id = header[5]
         player_car_index = header[10]
         self.session_uid = header[6]
+        self.player_car_index = player_car_index
 
+        if packet_id == PACKET_ID_MOTION:
+            return self._parse_motion(data)
         if packet_id == PACKET_ID_SESSION:
             return self._parse_session(data)
         if packet_id == PACKET_ID_LAP_DATA:
             return self._parse_lap_data(data, player_car_index)
+        if packet_id == PACKET_ID_PARTICIPANTS:
+            return self._parse_participants(data)
         if packet_id == PACKET_ID_CAR_STATUS:
             return self._parse_car_status(data, player_car_index)
         if packet_id == PACKET_ID_CAR_DAMAGE:
@@ -316,6 +374,37 @@ class F1TelemetryParser:  # pylint: disable=too-many-instance-attributes,too-few
 
     # -- private parse helpers ------------------------------------------------
 
+    def _parse_motion(self, data: bytes) -> int | None:
+        """Parse a Motion packet and update ``motion_data`` for all cars."""
+        cars: list[dict] = []
+        for i in range(NUM_CARS):
+            base = HEADER_SIZE + i * CAR_MOTION_SIZE
+            if len(data) < base + CAR_MOTION_SIZE:
+                break
+            f = CAR_MOTION_STRUCT.unpack_from(data, base)
+            cars.append({
+                "world_position_x": round(f[0], 2),
+                "world_position_y": round(f[1], 2),
+                "world_position_z": round(f[2], 2),
+                "world_velocity_x": round(f[3], 2),
+                "world_velocity_y": round(f[4], 2),
+                "world_velocity_z": round(f[5], 2),
+                "world_forward_dir_x": f[6],
+                "world_forward_dir_y": f[7],
+                "world_forward_dir_z": f[8],
+                "world_right_dir_x": f[9],
+                "world_right_dir_y": f[10],
+                "world_right_dir_z": f[11],
+                "g_force_lateral": round(f[12], 3),
+                "g_force_longitudinal": round(f[13], 3),
+                "g_force_vertical": round(f[14], 3),
+                "yaw": round(f[15], 4),
+                "pitch": round(f[16], 4),
+                "roll": round(f[17], 4),
+            })
+        self.motion_data = cars
+        return PACKET_ID_MOTION
+
     def _parse_session(self, data: bytes) -> int | None:
         """Parse a Session packet and update ``session_state``."""
         if len(data) < HEADER_SIZE + SESSION_HEADER_SIZE:
@@ -326,6 +415,7 @@ class F1TelemetryParser:  # pylint: disable=too-many-instance-attributes,too-few
             "track_id": fields[6],
             "total_laps": fields[3],
             "track_length_m": int(fields[4]),
+            "track_length": fields[4],
             "session_time_left": fields[8],
             "session_duration": fields[9],
             "track_temperature": fields[1],
@@ -334,8 +424,40 @@ class F1TelemetryParser:  # pylint: disable=too-many-instance-attributes,too-few
         }
         return PACKET_ID_SESSION
 
+    def _parse_participants(self, data: bytes) -> int | None:
+        """Parse a Participants packet and update ``participants_data``."""
+        # First byte after header is m_numActiveCars
+        if len(data) < HEADER_SIZE + 1:
+            return None
+        num_active = data[HEADER_SIZE]
+        participants: list[dict] = []
+        for i in range(min(num_active, NUM_CARS)):
+            base = HEADER_SIZE + 1 + i * PARTICIPANT_SIZE
+            if len(data) < base + PARTICIPANT_SIZE:
+                break
+            fields = PARTICIPANT_STRUCT.unpack_from(data, base)
+            driver_id = fields[1]
+            team_id = fields[3]
+            raw_name = fields[7]  # 48-byte name field
+            name = raw_name.split(b"\x00", 1)[0].decode("utf-8", errors="replace")
+            # Use known abbreviation from driver ID, fall back to first 3 chars of name
+            abbrev = DRIVER_ABBREVIATIONS.get(driver_id, "")
+            if not abbrev and name:
+                abbrev = name[:3].upper()
+            team_abbrev = TEAM_ABBREVIATIONS.get(team_id, "")
+            participants.append({
+                "driver_id": driver_id,
+                "team_id": team_id,
+                "race_number": fields[5],
+                "name": name,
+                "abbreviation": abbrev,
+                "team_abbreviation": team_abbrev,
+            })
+        self.participants_data = participants
+        return PACKET_ID_PARTICIPANTS
+
     def _parse_lap_data(self, data: bytes, idx: int) -> int | None:
-        """Parse a LapData packet and update ``lap_state``."""
+        """Parse a LapData packet and update ``lap_state`` and ``all_cars_lap_data``."""
         base = HEADER_SIZE + idx * LAPDATA_SIZE
         if len(data) < base + LAPDATA_SIZE:
             return None
@@ -348,6 +470,20 @@ class F1TelemetryParser:  # pylint: disable=too-many-instance-attributes,too-few
             "last_lap_time_ms": fields[0],
             "current_lap_time_ms": fields[1],
         }
+        # Parse all cars for the track map
+        all_cars: list[dict] = []
+        for i in range(NUM_CARS):
+            car_base = HEADER_SIZE + i * LAPDATA_SIZE
+            if len(data) < car_base + LAPDATA_SIZE:
+                break
+            car = LAPDATA_STRUCT.unpack_from(data, car_base)
+            all_cars.append({
+                "position": car[13],
+                "lap_distance": round(car[10], 2),
+                "driver_status": car[25],
+                "result_status": car[26],
+            })
+        self.all_cars_lap_data = all_cars
         return PACKET_ID_LAP_DATA
 
     def _parse_car_status(self, data: bytes, idx: int) -> int | None:

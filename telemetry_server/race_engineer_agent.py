@@ -18,7 +18,7 @@ class RaceEngineerAgent:
     THINKING_FILE: str = "race_engineer"
     DEFAULT_INPUT: str = "DEFAULT"
 
-    def __init__(self) -> None:
+    def __init__(self, session_context=None) -> None:
         factory: AgentSessionFactory = AgentSessionFactory()
         # Create log folders if they don't exist
         os.makedirs(self.THINKING_DIR, exist_ok=True)
@@ -26,6 +26,11 @@ class RaceEngineerAgent:
         self._roll_log()
         self.session: Any = factory.create_session(session_type=self.SESSION_TYPE,
                                                    agent_name=self.AGENT_NETWORK_NAME)
+        # Append the current's session context to the agent's system prompt
+        if session_context:
+            original_instructions = self.session.agent_network.agent_spec_map[self.AGENT_NETWORK_NAME]["instructions"]
+            self.session.agent_network.agent_spec_map[self.AGENT_NETWORK_NAME]["instructions"] =\
+                original_instructions + "\n" + session_context
         # Initialize any conversation state here
         self.conversation_state: dict[str, Any] = {
             "last_chat_response": None,

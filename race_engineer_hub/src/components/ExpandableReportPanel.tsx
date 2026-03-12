@@ -1,20 +1,22 @@
 import { useState } from "react";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import ReactMarkdown from "react-markdown";
-import { Bot, Loader2, Maximize2 } from "lucide-react";
+import { Bot, Loader2, Maximize2, Radio } from "lucide-react";
 
-interface ReportEntry {
+export interface ReportEntry {
   text: string;
   time: string;
+  source?: "driver" | "engineer";
 }
 
 interface ExpandableReportPanelProps {
   title: string;
   responses: ReportEntry[];
   emptyMessage: string;
+  className?: string;
 }
 
-export function ExpandableReportPanel({ title, responses, emptyMessage }: ExpandableReportPanelProps) {
+export function ExpandableReportPanel({ title, responses, emptyMessage, className }: ExpandableReportPanelProps) {
   const [expanded, setExpanded] = useState(false);
   const scrollRef = useAutoScroll<HTMLDivElement>(responses.length);
   const expandedScrollRef = useAutoScroll<HTMLDivElement>(responses.length);
@@ -22,10 +24,14 @@ export function ExpandableReportPanel({ title, responses, emptyMessage }: Expand
   const content = (scrollRefProp: React.RefObject<HTMLDivElement>, heightClass: string) => (
     <div ref={scrollRefProp} className={`${heightClass} overflow-y-auto`}>
       {responses.map((r, i) => (
-        <div key={i} className="flex items-start gap-2 px-3 py-2 border-b last:border-b-0 border-border/20">
-          <Bot className="h-3.5 w-3.5 text-info shrink-0 mt-0.5" />
+        <div key={i} className={`flex items-start gap-2 px-3 py-2 border-b last:border-b-0 border-border/20 ${r.source === "driver" ? "bg-accent/5" : ""}`}>
+          {r.source === "driver"
+            ? <Radio className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
+            : <Bot className="h-3.5 w-3.5 text-info shrink-0 mt-0.5" />}
           <div className="prose prose-xs prose-invert max-w-none text-[11px] text-card-foreground leading-tight [&>p]:m-0 flex-1">
-            <ReactMarkdown>{r.text}</ReactMarkdown>
+            {r.source === "driver"
+              ? <span><span className="font-display text-[9px] font-bold tracking-wider text-accent/60">FERNANDO &gt; </span>{r.text}</span>
+              : <ReactMarkdown>{r.text}</ReactMarkdown>}
           </div>
           <span className="text-[9px] text-muted-foreground tracking-wider shrink-0">{r.time}</span>
         </div>
@@ -56,9 +62,9 @@ export function ExpandableReportPanel({ title, responses, emptyMessage }: Expand
   return (
     <>
       {/* Inline panel */}
-      <div className="bg-card border border-border/50 rounded-md overflow-hidden">
+      <div className={`bg-card border border-border/50 rounded-md overflow-hidden flex flex-col ${className ?? ""}`}>
         {header(() => setExpanded(true))}
-        {content(scrollRef, "h-36")}
+        {content(scrollRef, className ? "flex-1" : "h-36")}
       </div>
 
       {/* Expanded overlay */}
@@ -77,10 +83,14 @@ export function ExpandableReportPanel({ title, responses, emptyMessage }: Expand
               className="max-h-[70vh] overflow-y-auto"
             >
               {responses.map((r, i) => (
-                <div key={i} className="flex items-start gap-2 px-4 py-3 border-b last:border-b-0 border-border/20">
-                  <Bot className="h-4 w-4 text-info shrink-0 mt-0.5" />
+                <div key={i} className={`flex items-start gap-2 px-4 py-3 border-b last:border-b-0 border-border/20 ${r.source === "driver" ? "bg-accent/5" : ""}`}>
+                  {r.source === "driver"
+                    ? <Radio className="h-4 w-4 text-accent shrink-0 mt-0.5" />
+                    : <Bot className="h-4 w-4 text-info shrink-0 mt-0.5" />}
                   <div className="prose prose-sm prose-invert max-w-none text-sm text-card-foreground leading-relaxed [&>p]:m-0 flex-1">
-                    <ReactMarkdown>{r.text}</ReactMarkdown>
+                    {r.source === "driver"
+                      ? <span><span className="font-display text-[10px] font-bold tracking-wider text-accent/60">FERNANDO &gt; </span>{r.text}</span>
+                      : <ReactMarkdown>{r.text}</ReactMarkdown>}
                   </div>
                   <span className="text-[10px] text-muted-foreground tracking-wider shrink-0">{r.time}</span>
                 </div>

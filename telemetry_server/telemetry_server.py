@@ -33,7 +33,9 @@ from telemetry_server.f1_telemetry_parser import (
     ACTUAL_COMPOUND,
     F1TelemetryParser,
     HEADER_SIZE,
+    NUM_CARS,
     PACKET_ID_CAR_TELEMETRY,
+    PACKET_ID_SESSION,
     VISUAL_COMPOUND,
     WHEEL_NAMES,
 )
@@ -57,6 +59,13 @@ setup_state: dict = {}
 motion_ex_state: dict = {}
 session_state: dict = {}
 session_time: float = 0.0
+prev_session_uid: int = 0
+
+# Track map state – world positions for all cars + all-car lap data
+motion_positions: list[dict] = []
+all_lap_data: list[dict] = []
+participants: list[dict] = []
+player_car_idx: int = 0
 
 # Alert state – computed server-side and sent pre-computed via WebSocket
 aero_alert_conditions: dict = {}   # key -> {"level": "warn"|"crit", "value": float}
@@ -140,7 +149,8 @@ connected_clients: set = set()
 CSV_FIELDNAMES = [
     "wall_time", "session_uid", "session_time", "frame_id",
     # Session
-    "session_type", "track_name", "session_time_left",
+    "session_type", "track_name", "session_time_left", "track_length",
+    "player_car_index",
     # Lap
     "current_lap_num", "car_position", "lap_distance_m",
     "last_lap_time_ms", "current_lap_time_ms",
@@ -169,6 +179,15 @@ CSV_FIELDNAMES += [
     "front_left_wing_damage", "front_right_wing_damage", "rear_wing_damage",
     "floor_damage", "diffuser_damage", "sidepod_damage", "drs_fault",
 ]
+# Per-car track map columns (22 cars)
+for _ci in range(NUM_CARS):
+    CSV_FIELDNAMES += [
+        f"car{_ci}_x", f"car{_ci}_z",
+        f"car{_ci}_position", f"car{_ci}_lap_distance",
+        f"car{_ci}_driver_status", f"car{_ci}_result_status",
+        f"car{_ci}_driver_id", f"car{_ci}_team_id",
+        f"car{_ci}_abbreviation", f"car{_ci}_team_abbreviation",
+    ]
 
 
 class CsvCapture:
@@ -216,6 +235,8 @@ class CsvCapture:
             ),
             "track_name": TRACK_NAMES.get(session_state.get("track_id", -1), "unknown"),
             "session_time_left": session_state.get("session_time_left", 0),
+            "track_length": session_state.get("track_length", 0),
+            "player_car_index": player_car_idx,
             # Lap
             "current_lap_num": lap_state.get("current_lap_num", ""),
             "car_position": lap_state.get("car_position", ""),
@@ -269,6 +290,22 @@ class CsvCapture:
             row[f"tyre_pressure_{wn}"] = telemetry_state.get(f"tyre_pressure_{wn}", "")
             row[f"brake_temp_{wn}"] = telemetry_state.get(f"brake_temp_{wn}", "")
 
+        # Per-car track map data
+        for ci in range(NUM_CARS):
+            m = motion_positions[ci] if ci < len(motion_positions) else {}
+            lap = all_lap_data[ci] if ci < len(all_lap_data) else {}
+            part = participants[ci] if ci < len(participants) else {}
+            row[f"car{ci}_x"] = m.get("world_position_x", "")
+            row[f"car{ci}_z"] = m.get("world_position_z", "")
+            row[f"car{ci}_position"] = lap.get("position", "")
+            row[f"car{ci}_lap_distance"] = lap.get("lap_distance", "")
+            row[f"car{ci}_driver_status"] = lap.get("driver_status", "")
+            row[f"car{ci}_result_status"] = lap.get("result_status", "")
+            row[f"car{ci}_driver_id"] = part.get("driver_id", "")
+            row[f"car{ci}_team_id"] = part.get("team_id", "")
+            row[f"car{ci}_abbreviation"] = part.get("abbreviation", "")
+            row[f"car{ci}_team_abbreviation"] = part.get("team_abbreviation", "")
+
         self._writer.writerow(row)
         self._file.flush()
 
@@ -306,10 +343,56 @@ BRAKE_TEMPS = [
 
 
 def _format_session_time(seconds: float) -> str:
+    """Format session time in seconds as MM:SS."""
     total = int(seconds)
     m = total // 60
     s = total % 60
     return f"{m:02d}:{s:02d}"
+
+
+WEATHER_LABELS = {
+    0: "Clear", 1: "Light Cloud", 2: "Overcast",
+    3: "Light Rain", 4: "Heavy Rain", 5: "Storm",
+}
+
+
+def _build_session_context() -> str:
+    """Build a human-readable session context string from the current session state."""
+    session_type = SESSION_TYPE_LABELS.get(session_state.get("session_type", 0), "Unknown")
+    track = TRACK_NAMES.get(session_state.get("track_id", -1), "Unknown Track")
+    total_laps = session_state.get("total_laps", 0)
+    weather = WEATHER_LABELS.get(session_state.get("weather", 0), "Unknown")
+    air_temp = session_state.get("air_temperature", 0)
+    track_temp = session_state.get("track_temperature", 0)
+
+    lines = [
+        "## Current Session Context",
+        f"- Session: {session_type}",
+        f"- Track: {track}",
+        f"- Weather: {weather}",
+        f"- Air temperature: {air_temp}°C",
+        f"- Track temperature: {track_temp}°C",
+    ]
+    if total_laps > 0:
+        lines.append(f"- Total laps: {total_laps}")
+    return "\n".join(lines)
+
+
+def _reinit_agents(context: str) -> None:
+    """Re-instantiate all agents with the given session context."""
+    global damage_agent, tyres_agent, pu_agent, re_agent
+
+    for name, cls, var_name in [
+        ("DamageAgent", DamageAgent, "damage_agent"),
+        ("TyresAgent", TyresAgent, "tyres_agent"),
+        ("PowerUnitAgent", PowerUnitAgent, "pu_agent"),
+        ("RaceEngineerAgent", RaceEngineerAgent, "re_agent"),
+    ]:
+        try:
+            globals()[var_name] = cls(session_context=context)
+            print(f"{name} re-initialized with session context")
+        except Exception as exc:
+            print(f"{name} re-init failed: {exc}")
 
 
 def _process_aero_alerts(aero: dict) -> None:
@@ -1091,6 +1174,7 @@ def build_message() -> tuple[str, list[dict], list[dict], list[dict]]:
         "trackLengthM": track_length_m,
         "sessionTimeLeft": session_state.get("session_time_left", 0),
         "sessionDuration": session_state.get("session_duration", 0),
+        "trackLength": session_state.get("track_length", 0),
         "trackTemp": session_state.get("track_temperature", 0),
         "airTemp": session_state.get("air_temperature", 0),
         "weather": session_state.get("weather", 0),
@@ -1106,6 +1190,30 @@ def build_message() -> tuple[str, list[dict], list[dict], list[dict]]:
         total_distance_m = (current_lap - 1) * track_length_m + lap_distance_m
     total_distance_m = round(total_distance_m, 2) if total_distance_m is not None else lap_distance_m
 
+    # -- Track map: merge motion positions with per-car lap data --
+    track_map = None
+    if motion_positions:
+        track_map_cars = []
+        for i in range(len(motion_positions)):
+            m = motion_positions[i]
+            lap = all_lap_data[i] if i < len(all_lap_data) else {}
+            participant = participants[i] if i < len(participants) else {}
+            wx = m.get("world_position_x", 0)
+            wz = m.get("world_position_z", 0)
+            track_map_cars.append({
+                "x": wx,
+                "z": wz,
+                "position": lap.get("position", 0),
+                "lapDistance": lap.get("lap_distance", 0),
+                "active": (wx != 0 or wz != 0) and lap.get("driver_status", 0) >= 1,
+                "abbreviation": participant.get("abbreviation", ""),
+                "teamAbbreviation": participant.get("team_abbreviation", ""),
+            })
+        track_map = {
+            "playerIndex": player_car_idx,
+            "cars": track_map_cars,
+        }
+
     msg = json.dumps({
         "tyres": tyres,
         "compound": status_state.get("tyre_compound_actual", ""),
@@ -1119,6 +1227,7 @@ def build_message() -> tuple[str, list[dict], list[dict], list[dict]]:
         "powerUnit": power_unit,
         "aero": aero,
         "session": session,
+        "trackMap": track_map,
         "tyreAlerts": {
             "alerts": tyre_alerts_log,
             "activeCount": len(tyre_alert_conditions),
@@ -1187,6 +1296,8 @@ async def udp_reader():
     """Read F1 25 UDP packets and update shared state, broadcasting on each
     telemetry frame (packet 6)."""
     global lap_state, status_state, damage_state, telemetry_state, setup_state, motion_ex_state, session_state, session_time
+    global prev_session_uid
+    global motion_positions, all_lap_data, participants, player_car_idx
 
     loop = asyncio.get_running_loop()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -1219,6 +1330,18 @@ async def udp_reader():
             damage_state = parser.damage_state
             setup_state = parser.setup_state
             motion_ex_state = parser.motion_ex_state
+            motion_positions = parser.motion_data
+            all_lap_data = parser.all_cars_lap_data
+            participants = parser.participants_data
+            player_car_idx = parser.player_car_index
+
+            # Detect new session and re-instantiate agents with session context
+            if packet_id == PACKET_ID_SESSION and parser.session_uid != prev_session_uid:
+                prev_session_uid = parser.session_uid
+                context = _build_session_context()
+                print(f"New session detected — re-initializing agents\n{context}")
+                await asyncio.to_thread(_reinit_agents, context)
+
             continue
 
         # -- Car Telemetry (main trigger) --
@@ -1283,13 +1406,17 @@ def _populate_state_from_row(row: dict):
     """Fill the shared state dicts from a single CSV row."""
     global lap_state, status_state, damage_state, telemetry_state
     global setup_state, motion_ex_state, session_state, session_time
+    global motion_positions, all_lap_data, participants, player_car_idx
 
     session_time = _float(row.get("session_time"))
+
+    player_car_idx = _int(row.get("player_car_index"))
 
     session_state = {
         "session_type": REVERSE_SESSION_TYPE.get(row.get("session_type", ""), 0),
         "track_id": REVERSE_TRACK.get(row.get("track_name", ""), -1),
         "session_time_left": _int(row.get("session_time_left")),
+        "track_length": _int(row.get("track_length")),
         "total_laps": 0,
         "session_duration": 0,
         "track_temperature": 0,
@@ -1365,9 +1492,39 @@ def _populate_state_from_row(row: dict):
         "rear_aero_height": _float(row.get("rear_ride_height_mm")),
     }
 
+    # Reconstruct per-car track map data from CSV (new-format CSVs only)
+    new_motion: list[dict] = []
+    new_laps: list[dict] = []
+    new_parts: list[dict] = []
+    for ci in range(NUM_CARS):
+        x_val = row.get(f"car{ci}_x", "")
+        if x_val == "":
+            break  # Old CSV without per-car columns
+        new_motion.append({
+            "world_position_x": _float(x_val),
+            "world_position_z": _float(row.get(f"car{ci}_z")),
+        })
+        new_laps.append({
+            "position": _int(row.get(f"car{ci}_position")),
+            "lap_distance": _float(row.get(f"car{ci}_lap_distance")),
+            "driver_status": _int(row.get(f"car{ci}_driver_status")),
+            "result_status": _int(row.get(f"car{ci}_result_status")),
+        })
+        new_parts.append({
+            "driver_id": _int(row.get(f"car{ci}_driver_id")),
+            "team_id": _int(row.get(f"car{ci}_team_id")),
+            "abbreviation": row.get(f"car{ci}_abbreviation", ""),
+            "team_abbreviation": row.get(f"car{ci}_team_abbreviation", ""),
+        })
+    if new_motion:
+        motion_positions = new_motion
+        all_lap_data = new_laps
+        participants = new_parts
+
 
 async def csv_replay(filepath: str, speed: int = 1):
     """Replay a captured CSV file as if it were live telemetry."""
+    global prev_session_uid
     path = Path(filepath)
     if not path.exists():
         print(f"ERROR: file not found: {filepath}")
@@ -1391,6 +1548,15 @@ async def csv_replay(filepath: str, speed: int = 1):
             prev_wall_time = wall_time
 
             _populate_state_from_row(row)
+
+            # Detect new session in replay and re-init agents
+            row_uid = _int(row.get("session_uid"))
+            if row_uid and row_uid != prev_session_uid:
+                prev_session_uid = row_uid
+                context = _build_session_context()
+                print(f"New session detected in replay — re-initializing agents\n{context}")
+                await asyncio.to_thread(_reinit_agents, context)
+
             msg, new_aero_alerts, new_tyre_alerts, new_pu_alerts = build_message()
             await broadcast(msg)
 

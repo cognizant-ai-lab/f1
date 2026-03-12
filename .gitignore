@@ -216,6 +216,7 @@ node_modules/
 
 # Ignore folders that contain data
 data/
+!race_engineer_hub/src/data/
 
 # Logs
 logs/
