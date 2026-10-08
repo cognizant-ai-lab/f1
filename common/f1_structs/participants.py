@@ -36,3 +36,18 @@ PACKET_PARTICIPANTS_HEAD = {
 }
 
 # PacketParticipantsData: PACKET_HEADER + PACKET_PARTICIPANTS_HEAD + PARTICIPANT_DATA[22]
+
+# ---------------------------------------------------------------------------
+# 2026 Season Pack (packet format 2026): 60 bytes per participant, 24 participants.
+# m_driverId, m_networkId and m_teamId widen from uint8 to uint16.
+# Source: 2026 Season Pack Telemetry Output Structures (c) 2026 Electronic Arts Inc.
+# ---------------------------------------------------------------------------
+
+PARTICIPANT_DATA_2026 = {
+    **PARTICIPANT_DATA,
+    "m_driverId": "H",                       # uint16 - Driver id - see appendix, 65535 if network human
+    "m_networkId": "H",                      # uint16 - Network id - unique identifier for network players
+    "m_teamId": "H",                         # uint16 - Team id - see appendix
+}
+
+# PacketParticipantsData: PACKET_HEADER + PACKET_PARTICIPANTS_HEAD + PARTICIPANT_DATA_2026[24]

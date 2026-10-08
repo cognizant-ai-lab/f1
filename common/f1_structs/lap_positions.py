@@ -17,3 +17,14 @@ PACKET_LAP_POSITIONS_DATA = {
 }
 
 # PacketLapPositionsData: PACKET_HEADER + PACKET_LAP_POSITIONS_DATA
+
+# ---------------------------------------------------------------------------
+# 2026 Season Pack (packet format 2026): 24 car slots per lap instead of 22
+# (50 laps x 24 cars = 1200 bytes).
+# Source: 2026 Season Pack Telemetry Output Structures (c) 2026 Electronic Arts Inc.
+# ---------------------------------------------------------------------------
+
+PACKET_LAP_POSITIONS_DATA_2026 = {
+    **PACKET_LAP_POSITIONS_DATA,
+    "m_positionForVehicleIdx": "1200B",      # uint8[50][24] - Position of each car per lap, 0 if no record
+}

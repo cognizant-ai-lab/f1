@@ -25,3 +25,16 @@ PACKET_LOBBY_INFO_HEAD = {
 }
 
 # PacketLobbyInfoData: PACKET_HEADER + PACKET_LOBBY_INFO_HEAD + LOBBY_INFO_DATA[22]
+
+# ---------------------------------------------------------------------------
+# 2026 Season Pack (packet format 2026): 43 bytes per player, 24 players.
+# m_teamId widens from uint8 to uint16.
+# Source: 2026 Season Pack Telemetry Output Structures (c) 2026 Electronic Arts Inc.
+# ---------------------------------------------------------------------------
+
+LOBBY_INFO_DATA_2026 = {
+    **LOBBY_INFO_DATA,
+    "m_teamId": "H",                         # uint16   - Team id - see appendix (65535 if no team selected)
+}
+
+# PacketLobbyInfoData: PACKET_HEADER + PACKET_LOBBY_INFO_HEAD + LOBBY_INFO_DATA_2026[24]

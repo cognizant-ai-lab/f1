@@ -10,10 +10,14 @@ Usage:
     # result["m_carMotionData"][0]["m_worldPositionX"] == 123.4
 """
 
-from common.f1_decoder.packet_layout import PACKET_LAYOUTS
+from common.f1_decoder.packet_layout import PACKET_LAYOUTS_BY_FORMAT
 from common.f1_decoder.packet_layout import Segment
 from common.f1_decoder.struct_parser import StructParser
 from common.f1_structs.header import PACKET_HEADER
+
+
+class UnsupportedPacketFormatError(ValueError):
+    """Raised when a datagram's m_packetFormat has no known layout table."""
 
 
 class PacketDecoder:
@@ -39,6 +43,10 @@ class PacketDecoder:
         Scalar segments with merge=True are flattened into the top-level dict.
         Scalar segments with merge=False are nested under their segment name.
 
+        The layout table is selected by the header's m_packetFormat, so F1 25
+        (2025) and the 2026 Season Pack are both decoded from their own wire
+        formats.
+
         Args:
             data: Raw UDP datagram bytes.
 
@@ -46,13 +54,22 @@ class PacketDecoder:
             Decoded packet as a dict.
 
         Raises:
-            KeyError: If the packet ID is not in PACKET_LAYOUTS.
+            UnsupportedPacketFormatError: If m_packetFormat has no layout table.
+            KeyError: If the packet ID is not known for the packet format.
         """
-        # Peek at packet ID from the header
+        # Peek at the routing fields from the header
         header = self._header_parser.unpack(data)
         packet_id = header["m_packetId"]
+        packet_format = header["m_packetFormat"]
 
-        layout = PACKET_LAYOUTS[packet_id]
+        formats = PACKET_LAYOUTS_BY_FORMAT.get(packet_format)
+        if formats is None:
+            raise UnsupportedPacketFormatError(
+                f"unsupported packet format {packet_format} "
+                f"(supported: {sorted(PACKET_LAYOUTS_BY_FORMAT)})"
+            )
+
+        layout = formats[packet_id]
         result = {}
         offset = 0
 

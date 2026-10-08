@@ -118,3 +118,48 @@ SESSION_FIELDS_POST = {
     "m_sector2LapDistanceStart": "f",          # float  - Distance in m around track where sector 2 starts
     "m_sector3LapDistanceStart": "f",          # float  - Distance in m around track where sector 3 starts
 }
+
+# ---------------------------------------------------------------------------
+# 2026 Season Pack (packet format 2026): the session packet gains active aero
+# and DRS zone lists plus assist settings, appended after SESSION_FIELDS_POST.
+# Split across segments so each embedded array decodes on its own.
+# Source: 2026 Season Pack Telemetry Output Structures (c) 2026 Electronic Arts Inc.
+# ---------------------------------------------------------------------------
+
+# Active aero zone (start and end as a fraction of the lap)
+ACTIVE_AERO_ZONE = {
+    "m_zoneStart": "f",                       # float - Fraction (0..1) of the lap the zone starts
+    "m_zoneEnd": "f",                         # float - Fraction (0..1) of the lap the zone ends
+}
+
+# DRS zone (start and end as a fraction of the lap)
+DRS_ZONE = {
+    "m_zoneStart": "f",                       # float - Fraction (0..1) of the lap the zone starts
+    "m_zoneEnd": "f",                         # float - Fraction (0..1) of the lap the zone ends
+}
+
+# --- Segment 4: 2026 fields before the full-throttle active aero zones array ---
+SESSION_2026_AERO_FULL_HEAD = {
+    "m_activeAeroTrackStatus": "B",            # uint8 - 0 = Full, 1 = Partial
+    "m_numActiveAeroZonesFull": "B",           # uint8 - Number of full active aero zones to follow
+}
+
+# --- Segment 5: 2026 fields before the partial active aero zones array ---
+SESSION_2026_AERO_PARTIAL_HEAD = {
+    "m_numActiveAeroZonesPartial": "B",        # uint8 - Number of partial active aero zones to follow
+}
+
+# --- Segment 6: 2026 fields before the DRS zones array ---
+SESSION_2026_DRS_HEAD = {
+    "m_numDRSZones": "B",                      # uint8 - Number of DRS zones to follow
+}
+
+# --- Segment 7: 2026 trailing scalar fields ---
+SESSION_2026_POST_ZONES = {
+    "m_startReactionTime": "f",                # float - Driver start reaction time in seconds (0.0 if assisted)
+    "m_antiLockBrakesAssist": "B",             # uint8 - 0 = Off, 1 = On
+    "m_tractionControlAssist": "B",            # uint8 - 0 = Off, 1 = Medium, 2 = Full
+    "m_dynamicRacingLineHiVis": "B",           # uint8 - 0 = Off, 1 = On
+    "m_dynamicRacingLineColourBlind": "B",     # uint8 - 0 = Off, 1 = Protanopia, 2 = Deuteranopia, 3 = Tritanopia
+    "m_recurringRewindPrompt": "B",            # uint8 - 0 = Off, 1 = On
+}

@@ -1,10 +1,10 @@
 """Computes lap timing summaries and standings from telemetry state."""
 
 from common.f1_structs.f1_constants import DRIVER_ABBREVIATIONS
+from common.f1_structs.f1_constants import MAX_NUM_CARS
 from common.f1_structs.f1_constants import TEAM_ABBREVIATIONS
 from common.f1_structs.f1_constants import VISUAL_TYRE_COMPOUND
 
-NUM_CARS = 22
 RACE_SESSION_TYPES = {10, 11, 12, 15, 17}  # RACE, RACE 2, RACE 3, RACE SHORT, SPRINT
 
 
@@ -102,7 +102,7 @@ class TimingProcessor:
         status_cars = status_pkt.get("m_carStatusData", [])
 
         standings = []
-        for i in range(min(len(lap_cars), NUM_CARS)):
+        for i in range(min(len(lap_cars), MAX_NUM_CARS)):
             car = lap_cars[i]
             part = parts_cars[i] if i < len(parts_cars) else {}
             status_car = status_cars[i] if i < len(status_cars) else {}
@@ -160,7 +160,7 @@ class TimingProcessor:
         status_cars = status_pkt.get("m_carStatusData", [])
 
         entries = []
-        for i in range(min(len(lap_cars), NUM_CARS)):
+        for i in range(min(len(lap_cars), MAX_NUM_CARS)):
             car = lap_cars[i]
             part = parts_cars[i] if i < len(parts_cars) else {}
             status_car = status_cars[i] if i < len(status_cars) else {}

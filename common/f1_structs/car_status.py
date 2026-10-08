@@ -38,3 +38,18 @@ CAR_STATUS_DATA = {
 }
 
 # PacketCarStatusData: PACKET_HEADER + CAR_STATUS_DATA[22]
+
+# ---------------------------------------------------------------------------
+# 2026 Season Pack (packet format 2026): 59 bytes per car, 24 cars.
+# Adds m_ersHarvestLimitPerLap after m_ersDeployMode.
+# Source: 2026 Season Pack Telemetry Output Structures (c) 2026 Electronic Arts Inc.
+# ---------------------------------------------------------------------------
+
+CAR_STATUS_DATA_2026: dict[str, str] = {}
+for _field_name, _field_format in CAR_STATUS_DATA.items():
+    CAR_STATUS_DATA_2026[_field_name] = _field_format
+    if _field_name == "m_ersDeployMode":
+        # Inserted here to match the 2026 wire order.
+        CAR_STATUS_DATA_2026["m_ersHarvestLimitPerLap"] = "f"  # ERS energy harvest limit for this lap
+
+# PacketCarStatusData: PACKET_HEADER + CAR_STATUS_DATA_2026[24]

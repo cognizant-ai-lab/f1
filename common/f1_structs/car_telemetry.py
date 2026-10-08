@@ -35,3 +35,16 @@ PACKET_CAR_TELEMETRY_TAIL = {
 }
 
 # PacketCarTelemetryData: PACKET_HEADER + CAR_TELEMETRY_DATA[22] + PACKET_CAR_TELEMETRY_TAIL
+
+# ---------------------------------------------------------------------------
+# 2026 Season Pack (packet format 2026): 59 bytes per car, 24 cars.
+# m_engineTemperature narrows from uint16 to uint8.
+# Source: 2026 Season Pack Telemetry Output Structures (c) 2026 Electronic Arts Inc.
+# ---------------------------------------------------------------------------
+
+CAR_TELEMETRY_DATA_2026 = {
+    **CAR_TELEMETRY_DATA,
+    "m_engineTemperature": "B",              # uint8     - Engine temperature (celsius)
+}
+
+# PacketCarTelemetryData: PACKET_HEADER + CAR_TELEMETRY_DATA_2026[24] + PACKET_CAR_TELEMETRY_TAIL

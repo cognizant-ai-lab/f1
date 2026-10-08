@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import traceback
 from typing import Any
 from typing import Callable
 
@@ -55,6 +56,7 @@ class AgentDispatchManager:
                 print(f"{name} initialized")
             except Exception as exc:
                 print(f"{name} unavailable: {exc}")
+                traceback.print_exc()
 
     def reinit_agents(self, context: str) -> None:
         """Re-create all agents with the given session context."""
@@ -64,6 +66,7 @@ class AgentDispatchManager:
                 print(f"{name} re-initialized with session context")
             except Exception as exc:
                 print(f"{name} re-init failed: {exc}")
+                traceback.print_exc()
 
     def reset_all(self) -> None:
         """Reset all dispatchers (e.g. on session change)."""

@@ -4,6 +4,11 @@ All lookup tables are derived from the official F1 25 UDP specification appendic
 Import individual dicts as needed.
 """
 
+# Maximum cars the wire format can carry. 2025 packets pack 22 car slots; the
+# 2026 Season Pack packs 24. Decoders use the per-format count; this bound is
+# for code that needs an upper limit without knowing the packet format.
+MAX_NUM_CARS = 24
+
 # ---------------------------------------------------------------------------
 # Teams
 # ---------------------------------------------------------------------------

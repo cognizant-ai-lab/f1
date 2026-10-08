@@ -24,3 +24,13 @@ TIME_TRIAL_DATA_SET = {
 #                      + TIME_TRIAL_DATA_SET (m_playerSessionBestDataSet)
 #                      + TIME_TRIAL_DATA_SET (m_personalBestDataSet)
 #                      + TIME_TRIAL_DATA_SET (m_rivalDataSet)
+
+# ---------------------------------------------------------------------------
+# 2026 Season Pack (packet format 2026): m_teamId widens from uint8 to uint16.
+# Source: 2026 Season Pack Telemetry Output Structures (c) 2026 Electronic Arts Inc.
+# ---------------------------------------------------------------------------
+
+TIME_TRIAL_DATA_SET_2026 = {
+    **TIME_TRIAL_DATA_SET,
+    "m_teamId": "H",                         # uint16 - Team id - see appendix
+}

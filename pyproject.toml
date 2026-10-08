@@ -14,7 +14,7 @@ ignore = []
 
 [tool.ruff.lint.isort]
 force-single-line = true
-known-first-party = ["telemetry_server"]
+known-first-party = ["common", "telemetry_server"]
 
 [tool.pylint]
 max-line-length = 119

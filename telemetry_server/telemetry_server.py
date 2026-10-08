@@ -16,6 +16,7 @@ import os
 
 from dotenv import load_dotenv
 
+from common.f1_structs.f1_constants import MAX_NUM_CARS
 from telemetry_server.alerts.aero_alert_processor import AeroAlertProcessor
 from telemetry_server.alerts.pit_alert_processor import PitAlertProcessor
 from telemetry_server.alerts.pu_alert_processor import PuAlertProcessor
@@ -110,7 +111,7 @@ class TelemetryServer:
         self.state[packet_id] = decoded
         if packet_id == 11:
             car_idx = decoded.get("m_carIdx", -1)
-            if 0 <= car_idx < 22:
+            if 0 <= car_idx < MAX_NUM_CARS:
                 self.session_histories[car_idx] = decoded
 
     @staticmethod

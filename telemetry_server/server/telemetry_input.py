@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import struct
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,8 @@ from common.f1_capture.capture_session import CaptureSession
 from common.f1_capture.replay_session import ReplaySession
 from common.f1_capture.udp_listener import UdpListener
 from common.f1_decoder.packet_decoder import PacketDecoder
+from common.f1_decoder.packet_decoder import UnsupportedPacketFormatError
+from common.f1_structs.f1_constants import MAX_NUM_CARS
 
 if TYPE_CHECKING:
     from telemetry_server.telemetry_server import TelemetryServer
@@ -50,9 +53,15 @@ class TelemetryInput:
         try:
             while True:
                 datagram = await listener.queue.get()
-                header = decoder.decode_header(datagram)
-                packet_id = header["m_packetId"]
-                server.store_packet(packet_id, decoder.decode(datagram))
+                try:
+                    packet_id = decoder.decode_header(datagram)["m_packetId"]
+                    decoded = decoder.decode(datagram)
+                except (struct.error, KeyError, UnsupportedPacketFormatError) as exc:
+                    # UDP input is untrusted: one malformed or unknown packet
+                    # must not tear down the whole telemetry stream.
+                    print(f"[UdpListener] dropping undecodable {len(datagram)}-byte packet: {exc}")
+                    continue
+                server.store_packet(packet_id, decoded)
 
                 if capture_session:
                     capture_session.process(datagram, decode=False)
@@ -113,7 +122,7 @@ class TelemetryInput:
                 pkt11 = server.state.get(11)
                 if pkt11:
                     car_idx = pkt11.get("m_carIdx", -1)
-                    if 0 <= car_idx < 22:
+                    if 0 <= car_idx < MAX_NUM_CARS:
                         server.session_histories[car_idx] = pkt11
 
                 # Detect new session

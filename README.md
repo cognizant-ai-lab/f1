@@ -51,6 +51,12 @@ pip install -r requirements.txt
 
 [F1 25 Telemetry Application (w/ PySide6)](https://github.com/Fredrik2002/f1-25-telemetry-application#)
 
+Both packet formats are decoded: base F1 25 (packet format 2025, 22 car slots) and the
+2026 Season Pack (packet format 2026, 24 car slots, plus the extra packet 16 "Car Telemetry 2").
+The decoder picks the layout from the header's `m_packetFormat`, so the same server works with
+either game version. A packet the decoder does not understand is logged and skipped instead of
+stopping the telemetry stream.
+
 Test listening to UDP packets:
 ```shell
 python -m test_udp

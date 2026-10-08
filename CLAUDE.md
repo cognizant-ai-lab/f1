@@ -77,7 +77,7 @@ Each specialist agent (`telemetry_server/agents/*_agent.py`) uses `AgentSessionF
 
 ### Telemetry parsing
 
-`common.f1_decoder.PacketDecoder` decodes all 16 F1 25 UDP packet types into nested Python dicts (keyed by `m_packetId`). `TelemetryStateAdapter` (`telemetry_server/telemetry_state_adapter.py`) translates the decoded state into the flat camelCase dicts consumed by the WebSocket JSON messages and alert system. Packet ID 6 (Car Telemetry) is the trigger packet — when received, the server builds and broadcasts the full JSON message. Live capture and replay use `.f1bin` binary format via `common.f1_capture`.
+`common.f1_decoder.PacketDecoder` decodes F1 25 UDP packets into nested Python dicts (keyed by `m_packetId`). It selects the layout table from the header's `m_packetFormat`: `PACKET_LAYOUTS` for base F1 25 (format 2025, 22 cars, packets 0-15) and `PACKET_LAYOUTS_2026` for the 2026 Season Pack (format 2026, 24 cars, adds packet 16 "Car Telemetry 2"). An unknown format raises `UnsupportedPacketFormatError`. `TelemetryStateAdapter` (`telemetry_server/telemetry_state_adapter.py`) translates the decoded state into the flat camelCase dicts consumed by the WebSocket JSON messages and alert system. Packet ID 6 (Car Telemetry) is the trigger packet — when received, the server builds and broadcasts the full JSON message. Live capture and replay use `.f1bin` binary format via `common.f1_capture`.
 
 ### Frontend patterns
 
