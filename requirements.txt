@@ -17,3 +17,4 @@ websockets>=14.0
 # Code quality
 ruff==0.15.5
 pylint==4.0.5
+mypy==2.4.1
