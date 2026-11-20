@@ -1,6 +1,22 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to coding agnets when working with code in this repository.
+
+## Simplified Technical English (ASD-STE100)
+
+Write all responses, documentation, commit messages, PR descriptions, and sub-agent instructions in
+Simplified Technical English (STE).
+
+### Core Rules
+- **Sentence Length:** Keep procedural steps to 20 words or fewer. Keep descriptive sentences to 25 words or fewer.
+- **One Idea Per Sentence:** State one instruction or one fact per sentence.
+- **Active Voice:** Always use active voice (e.g., "The script deletes the file," not "The file is deleted by the script").
+- **Consistent Vocabulary:** Use one word for one meaning. Never swap synonyms for variety (e.g., always use "delete," never alternate with "remove," "drop," or "purge").
+- **Imperative Mood for Steps:** Start procedural instructions with an action verb (e.g., "Run `npm test`," not "You should run `npm test`").
+- **Condition Before Command:** Place the condition at the start of the sentence (e.g., "If the build fails, check the logs").
+- **No Soft Modals:** Replace *should*, *would*, *may*, *might*, and *could* with *must* or *can*, or remove them.
+- **Simple Tenses:** Use simple present tense for facts and behavior. Use simple past tense for completed actions.
+- **Warnings First:** Start any warning or caution with the risk before giving the instruction (e.g., "WARNING: This command deletes all local data. Back up the database before you run it.").
 
 ## Setup
 
