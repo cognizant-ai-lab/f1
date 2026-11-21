@@ -1,20 +1,19 @@
-# Neuro SAN
-neuro-san==0.6.47
-nsflow==0.6.18
+# Neuro SAN Studio
+neuro-san-studio==0.4.5
 
 # For Anthropic LLM
-langchain_anthropic==1.4.8
+langchain-anthropic>=1.7.12,<2.0
 
 # To use a .env file for environment variables
-python-dotenv==1.2.4
+python-dotenv>=1.2.4,<2.0.0
 
 # For the F1 telemetry tools https://github.com/Fredrik2002/f1-25-telemetry-application
-PySide6==6.9.3
+PySide6==6.12.0
 
 # WebSocket bridge for race_engineer_hub live telemetry
-websockets>=14.0
+websockets>=17.4
 
 # Code quality
-ruff==0.15.5
-pylint==4.0.10
+ruff==0.17.6
+pylint==4.1.4
 mypy==2.4.1
