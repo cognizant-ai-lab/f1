@@ -1,3 +1,4 @@
+import argparse
 import csv
 import socket
 import struct
@@ -5,8 +6,9 @@ import time
 from pathlib import Path
 
 # ---- UDP config ----
-UDP_IP = "0.0.0.0"
-UDP_PORT = 20777
+# Listen on the loopback interface by default. Use --host 0.0.0.0 to receive packets from another machine.
+DEFAULT_UDP_HOST = "127.0.0.1"
+DEFAULT_UDP_PORT = 20777
 
 # ---- Packet constants (F1 25 spec) ----
 PACKET_ID_LAP_DATA = 2  # Lap Data packetId is 2  [oai_citation:3‡EA Forums](https://forums.ea.com/t5/s/tghpe58374/attachments/tghpe58374/f1-games-game-info-hub-en/61/4/Data%20Output%20from%20F1%2025%20v3.pdf)
@@ -71,10 +73,22 @@ def ms_to_lapstr(ms: int) -> str:
     millis = rem % 1000
     return f"{minutes}:{seconds:02d}.{millis:03d}"
 
+def parse_args() -> argparse.Namespace:
+    """Parse the UDP host and port from the command line."""
+    parser = argparse.ArgumentParser(description="Log F1 25 lap data from UDP telemetry to a CSV file")
+    parser.add_argument(
+        "--host",
+        default=DEFAULT_UDP_HOST,
+        help="Bind address. Use 0.0.0.0 to receive packets from another machine (console or PC).",
+    )
+    parser.add_argument("--port", type=int, default=DEFAULT_UDP_PORT, help="UDP port to listen on")
+    return parser.parse_args()
+
 def main():
+    args = parse_args()
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((UDP_IP, UDP_PORT))
-    print(f"Listening on UDP {UDP_IP}:{UDP_PORT} ...")
+    sock.bind((args.host, args.port))
+    print(f"Listening on UDP {args.host}:{args.port} ...")
 
     # Create data directory if it doesn't exist
     data_dir = Path("data")

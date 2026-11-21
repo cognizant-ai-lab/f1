@@ -56,6 +56,12 @@ Test listening to UDP packets:
 python -m test_udp
 ```
 
+The script listens on `127.0.0.1` by default. If the game runs on another machine (console or PC), listen on all
+interfaces:
+```shell
+python -m test_udp --host 0.0.0.0
+```
+
 Run a sample script to capture telemetry:
 ```shell
 python -m telemetry_server --capture

@@ -1,12 +1,12 @@
 # Neuro SAN
 neuro-san==0.6.47
-nsflow==0.6.14
+nsflow==0.6.18
 
 # For Anthropic LLM
-langchain_anthropic==1.3.4
+langchain_anthropic==1.4.8
 
 # To use a .env file for environment variables
-python-dotenv==1.0.1
+python-dotenv==1.2.4
 
 # For the F1 telemetry tools https://github.com/Fredrik2002/f1-25-telemetry-application
 PySide6==6.9.3
@@ -16,5 +16,5 @@ websockets>=14.0
 
 # Code quality
 ruff==0.15.5
-pylint==4.0.5
+pylint==4.0.10
 mypy==2.4.1

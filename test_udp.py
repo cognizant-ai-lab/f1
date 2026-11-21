@@ -1,8 +1,10 @@
+import argparse
 import socket
 import struct
 
-HOST = "0.0.0.0"
-PORT = 20777
+# Listen on the loopback interface by default. Use --host 0.0.0.0 to receive packets from another machine.
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 20777
 
 HEADER_STRUCT = struct.Struct("<HBBBBBQfIIBB")
 
@@ -23,8 +25,17 @@ PACKET_NAMES = {
     13: "Motion Ex",
 }
 
+parser = argparse.ArgumentParser(description="Print the header of each F1 25 UDP telemetry packet")
+parser.add_argument(
+    "--host",
+    default=DEFAULT_HOST,
+    help="Bind address. Use 0.0.0.0 to receive packets from another machine (console or PC).",
+)
+parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="UDP port to listen on")
+args = parser.parse_args()
+
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((HOST, PORT))
+sock.bind((args.host, args.port))
 
 print("Listening on", sock.getsockname())
 
