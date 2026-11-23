@@ -116,7 +116,12 @@ class MessageBuilder:
                 "compoundVisual": compound_visual,
             })
 
-            new_pu_alerts = self._pu.process({**power_unit, "sessionTime": session_time})
+            new_pu_alerts = self._pu.process({
+                **power_unit,
+                "sessionTime": session_time,
+                "lapDistance": lap.get("lapDistance", 0),
+                "trackLength": session.get("trackLength", 0),
+            })
         else:
             new_aero_alerts = []
             new_tyre_alerts = []

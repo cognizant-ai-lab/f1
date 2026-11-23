@@ -4,13 +4,15 @@ from telemetry_server.alerts.alert_constants import PU_ALERT_DEFS
 from telemetry_server.alerts.alert_constants import PU_DAMAGE_KEYS
 from telemetry_server.alerts.alert_constants import PU_DAMAGE_REFIRE_STEP
 from telemetry_server.alerts.alert_utils import format_session_time
+from telemetry_server.alerts.fuel_lap_estimator import FuelLapEstimator
 
 
 class PuAlertProcessor:
     """Evaluates power unit telemetry snapshots and accumulates alerts.
 
     Tracks engine temperature, engine/gearbox damage, fuel remaining laps,
-    battery state-of-charge, ERS deploy mode changes, and fuel mix changes.
+    fuel needed to finish the lap (see ``FuelLapEstimator``), battery state-of-charge,
+    ERS deploy mode changes, and fuel mix changes.
     """
 
     def __init__(self) -> None:
@@ -20,14 +22,16 @@ class PuAlertProcessor:
         self.prev_session_time: float = 0.0
         self.prev_ers_mode: str = ""
         self.prev_fuel_mix: str = ""
+        self.fuel_estimator: FuelLapEstimator = FuelLapEstimator()
 
     def reset(self) -> None:
-        """Clear all accumulated state (e.g. on session change)."""
+        """Clear all accumulated state (e.g. on session change). The fuel estimator keeps its burn rate."""
         self.conditions.clear()
         self.alerts_log.clear()
         self.prev_session_time = 0.0
         self.prev_ers_mode = ""
         self.prev_fuel_mix = ""
+        self.fuel_estimator.reset()
 
     def process(self, snapshot: dict) -> list[dict]:
         """Process a power unit snapshot and return any new alerts."""
@@ -47,6 +51,11 @@ class PuAlertProcessor:
         gearbox_damage = snapshot.get("gearboxDamage", 0)
         fuel_delta_laps = snapshot.get("fuelRemainingLaps", 0)
         battery_pct = snapshot.get("batteryPct", 0)
+        fuel_in_tank = snapshot.get("fuelInTank", 0.0)
+        lap_distance = snapshot.get("lapDistance", 0.0)
+        track_length = snapshot.get("trackLength", 0)
+        self.fuel_estimator.update(fuel_in_tank, lap_distance, track_length)
+        fuel_needed = 0.0
 
         # Engine temperature
         if engine_temp > 130:
@@ -71,6 +80,17 @@ class PuAlertProcessor:
             current_conditions["fuel"] = {"level": "crit", "value": fuel_delta_laps}
         elif fuel_delta_laps < -1.0:
             current_conditions["fuel"] = {"level": "warn", "value": fuel_delta_laps}
+
+        # Fuel in tank vs fuel needed to finish this lap (crit) or this lap plus one more lap (warn)
+        fuel_to_finish = self.fuel_estimator.fuel_to_finish_lap(lap_distance, track_length)
+        fuel_per_lap = self.fuel_estimator.fuel_per_lap(track_length)
+        if fuel_to_finish is not None and fuel_per_lap is not None and lap_distance >= 0:
+            if fuel_in_tank < fuel_to_finish:
+                current_conditions["fuel_lap"] = {"level": "crit", "value": fuel_in_tank}
+                fuel_needed = fuel_to_finish
+            elif fuel_in_tank < fuel_to_finish + fuel_per_lap:
+                current_conditions["fuel_lap"] = {"level": "warn", "value": fuel_in_tank}
+                fuel_needed = fuel_to_finish + fuel_per_lap
 
         # Battery SOC
         if battery_pct < 15:
@@ -120,6 +140,14 @@ class PuAlertProcessor:
                         f"Fuel critical \u2014 {fuel_delta_laps:+.1f} laps vs plan"
                         if cur["level"] == "crit"
                         else f"Fuel short \u2014 {fuel_delta_laps:+.1f} laps vs plan"
+                    )
+                elif key == "fuel_lap":
+                    msg = (
+                        f"Fuel critical \u2014 cannot finish lap"
+                        f" ({fuel_in_tank:.2f} kg in tank, {fuel_needed:.2f} kg needed)"
+                        if cur["level"] == "crit"
+                        else f"Fuel low \u2014 cannot complete next lap"
+                        f" ({fuel_in_tank:.2f} kg in tank, {fuel_needed:.2f} kg needed)"
                     )
                 elif key == "battery":
                     msg = (
