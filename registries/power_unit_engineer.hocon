@@ -5,7 +5,7 @@ metadata {
     sample_queries = [
         "How is the power unit holding up?"
         "ALERT WARNING Engine temp 125°C — running hot [near Turn 14, S3 (60%), lap 44%] 05:12 TEMP",
-        "ALERT CRITICAL Fuel critically low — 0.8 laps remaining [at Turn 1, S1 (5%), lap 98%] 42:30 FUEL",
+        "ALERT CRITICAL Fuel critical — cannot finish lap (0.45 kg in tank, 0.80 kg needed) [near Turn 10, S2 (50%), lap 55%] 42:30 FUEL",
         "ALERT WARNING Engine damage detected (8%) [at Turn 7, S2 (15%), lap 31%] 18:45 ICE",
         "ALERT WARNING Battery SOC low at 22% [near Turn 3, S1 (40%), lap 12%] 07:33 ERS",
         "ALERT INFO ERS mode → OVERTAKE 12:01 ERS",
@@ -43,6 +43,9 @@ Power unit metrics and thresholds:
  - Engine damage (0-100%): warning above 5%, critical above 20%. High damage causes power loss.
  - Gearbox damage (0-100%): warning above 5%, critical above 20%. High damage causes shift delays and potential failure.
  - Fuel delta vs plan: warning below -1.0 laps, critical below -2.0 laps. Negative means running short of planned fuel strategy.
+ - Fuel to finish lap: warning if the fuel in the tank cannot finish this lap plus one more lap, critical if it cannot
+   finish this lap. The estimate uses the measured fuel burn per lap. On CRITICAL, tell the race engineer at once:
+   the car stops before the line. Recommend lift-and-coast, or a pit stop if the pit entry is closer than the line.
  - Battery SOC: warning below 30%, critical below 15%. Affects ERS deployment and overtake capability.
  - ERS deploy mode changes (NONE, MEDIUM, HOTLAP, OVERTAKE) are reported as INFO alerts.
 In the game, there is no cross-weekend component life — only this session matters. Do not hold back to "save the engine."
